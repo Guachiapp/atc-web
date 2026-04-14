@@ -15,7 +15,8 @@ export function createQueueTicketSubscriber(): Redis | null {
     return base.duplicate({
       lazyConnect: true,
       maxRetriesPerRequest: null,
-      enableOfflineQueue: false,
+      // Sin cola offline, `subscribe` puede lanzar "Stream isn't writeable" antes de que el socket esté listo.
+      enableOfflineQueue: true,
     });
   } catch (error) {
     console.error("[redis-runtime] duplicate subscriber failed", error);

@@ -45,6 +45,29 @@ function fingerprint(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
+/**
+ * Normaliza la IP antes de hashearla para la sesión de cola.
+ * Tras un proxy/Nginx la misma máquina puede verse como `190.x` o `::ffff:190.x`; sin esto el hash cambia y el polling falla con 403.
+ */
+function normalizeClientIpForSession(ip: string): string {
+  const t = (ip || "").trim();
+  if (t === "" || t === "unknown") return "unknown";
+  if (t.startsWith("::ffff:")) {
+    const v4 = t.slice(7).trim();
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(v4)) return v4;
+  }
+  return t;
+}
+
+function clientIpMatchesStoredHash(storedHash: string, contextIp: string): boolean {
+  const raw = (contextIp || "").trim() || "unknown";
+  const normalized = normalizeClientIpForSession(contextIp || "unknown");
+  return (
+    storedHash === fingerprint(normalized) ||
+    storedHash === fingerprint(raw === "" ? "unknown" : raw)
+  );
+}
+
 export async function validateQREntryToken(token: string): Promise<QREntryPayload | null> {
   const data = decodeAndVerifyToken<QREntryPayload>(token, getQRSecret());
   if (!data) return null;
@@ -98,7 +121,7 @@ export async function issueQueueSession(params: {
     JSON.stringify({
       condominioId: payload.condominioId,
       empresaId: payload.empresaId,
-      ipHash: fingerprint(params.ip || "unknown"),
+      ipHash: fingerprint(normalizeClientIpForSession(params.ip || "unknown")),
       uaHash: fingerprint(params.userAgent || "unknown"),
       expiresAt: payload.expiresAt,
     }),
@@ -126,7 +149,7 @@ export async function assertQueueSessionAccess(
     if (Date.now() > session.expiresAt) return null;
     if (session.condominioId !== payload.condominioId) return null;
     if ((session.empresaId ?? null) !== (payload.empresaId ?? null)) return null;
-    if (session.ipHash !== fingerprint(context.ip || "unknown")) return null;
+    if (!clientIpMatchesStoredHash(session.ipHash, context.ip || "unknown")) return null;
     if (session.uaHash !== fingerprint(context.userAgent || "unknown")) return null;
     return payload;
   } catch {

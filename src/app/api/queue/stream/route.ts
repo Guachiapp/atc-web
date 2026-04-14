@@ -119,6 +119,9 @@ export async function GET(request: NextRequest) {
       teardown = cleanup;
 
       try {
+        if (sub.status === "wait" || sub.status === "connecting" || sub.status === "reconnecting") {
+          await sub.connect();
+        }
         await sub.subscribe(channel);
         sub.on("message", onRedisMessage);
         sub.on("error", onRedisError);
