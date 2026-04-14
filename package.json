@@ -6,7 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "pm2:start": "pm2 start ecosystem.config.cjs --env production",
+    "pm2:stop": "pm2 stop guachi-atc-web",
+    "pm2:restart": "pm2 restart guachi-atc-web",
+    "pm2:delete": "pm2 delete guachi-atc-web",
+    "pm2:logs": "pm2 logs guachi-atc-web",
+    "pm2:monit": "pm2 monit",
+    "pm2:save": "pm2 save",
+    "pm2:startup": "pm2 startup"
   },
   "dependencies": {
     "framer-motion": "^12.38.0",
