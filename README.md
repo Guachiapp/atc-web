@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Guachi ATC Web
 
-## Getting Started
+Módulo web de ATC/gestión de colas para empresas integrado al ecosistema Guachi.
 
-First, run the development server:
+## Funcionalidades MVP implementadas
+
+- Ingreso público por QR firmado: `GET /q/[token]`.
+- Flujo visitante:
+  - validar QR,
+  - crear sesión efímera de cola,
+  - listar empresas por condominio,
+  - generar ticket,
+  - enviar datos opcionales del cliente.
+- Panel admin:
+  - login básico,
+  - generar QR firmado por condominio/empresa,
+  - revocar token QR.
+- Seguridad base:
+  - HMAC para QR y sesión efímera,
+  - route handlers server-side con `X-Internal-Key`,
+  - rate limiting,
+  - anti-enumeración por IP/ID.
+
+## Variables de entorno
+
+Usa `.env.example` como base.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Debes definir:
+- `NEXT_PUBLIC_APP_URL`
+- `NEXT_PUBLIC_API_BASE_URL`
+- `API_INTERNAL_KEY`
+- `QR_TOKEN_SECRET`
+- `SESSION_SECRET`
+- `ADMIN_PASSWORD_HASH`
+- `REDIS_URL`
+- `TURNSTILE_SECRET_KEY` (CAPTCHA adaptativo)
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (si se integra widget en UI)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Generar `ADMIN_PASSWORD_HASH`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+El hash sigue la lógica HMAC-SHA256 con `SESSION_SECRET`.
 
-## Learn More
+```bash
+node -e "const { createHmac } = require('crypto'); const secret='TU_SESSION_SECRET'; const pass='TU_PASSWORD_ADMIN'; console.log(createHmac('sha256', secret).update(pass).digest('hex'));"
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Desarrollo
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm install
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Portal público:
+- `http://localhost:3000`
 
-## Deploy on Vercel
+Portal admin:
+- `http://localhost:3000/admin/login`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Build
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run build
+npm run start
+```
+
+## Hardening implementado
+
+- **Persistencia de seguridad en Redis**:
+  - sesiones admin validadas contra store con TTL,
+  - sesiones efímeras de cola vinculadas a IP + user-agent hash,
+  - revocación de QR persistida por `jti` hasta expiración.
+- **CAPTCHA adaptativo**:
+  - score por riesgo/velocidad por IP y acción,
+  - exige token CAPTCHA solo cuando el score supera umbral,
+  - validación contra Turnstile (`TURNSTILE_SECRET_KEY`),
+  - en desarrollo permite token `dev-bypass` si no hay secret configurado.

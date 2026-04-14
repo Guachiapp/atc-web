@@ -1,26 +1,64 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --sa-primary: #5b87da;
+  --sa-primary-dark: #4a73c7;
+  --sa-primary-light: #7ba0e3;
+
+  --sa-secondary: #1b2630;
+  --sa-secondary-dark: #151e26;
+  --sa-secondary-light: #2a3a47;
+
+  --sa-additional: #424845;
+  --sa-bg-card: #ffffff;
+  --sa-bg-muted: #f8f9fa;
+
+  --sa-text-primary: #1b2630;
+  --sa-text-secondary: #424845;
+  --sa-text-muted: #6b7280;
+  --sa-text-inverted: #ffffff;
+
+  --sa-state-success: #10b981;
+  --sa-state-warning: #f59e0b;
+  --sa-state-error: #ef4444;
+
+  --sa-border-light: #e5e7eb;
+  --sa-border: #d1d5db;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --color-sa-primary: var(--sa-primary);
+  --color-sa-primary-dark: var(--sa-primary-dark);
+  --color-sa-primary-light: var(--sa-primary-light);
+  --color-sa-secondary: var(--sa-secondary);
+  --color-sa-secondary-dark: var(--sa-secondary-dark);
+  --color-sa-secondary-light: var(--sa-secondary-light);
+  --color-sa-bg-card: var(--sa-bg-card);
+  --color-sa-bg-muted: var(--sa-bg-muted);
+  --color-sa-text-primary: var(--sa-text-primary);
+  --color-sa-text-secondary: var(--sa-text-secondary);
+  --color-sa-text-muted: var(--sa-text-muted);
+  --color-sa-text-inverted: var(--sa-text-inverted);
+  --color-sa-state-success: var(--sa-state-success);
+  --color-sa-state-warning: var(--sa-state-warning);
+  --color-sa-state-error: var(--sa-state-error);
+  --color-sa-border-light: var(--sa-border-light);
+  --color-sa-border: var(--sa-border);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  height: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* Cabecera sticky compartida (landing, cola pública, admin) */
+.atc-sticky-header {
+  @apply sticky top-0 z-30 border-b border-white/10 bg-sa-secondary/85 backdrop-blur-[16px];
+}
+
+* {
+  box-sizing: border-box;
 }
