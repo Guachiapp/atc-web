@@ -411,6 +411,8 @@ export function QueueJoinFlow({ qrToken }: QueueJoinFlowProps) {
         queueSessionToken={queueSessionToken}
         userIdEmpresa={selectedEmpresa.userId}
         userRolIdEmpresa={selectedEmpresa.userRolId}
+        empresaNombre={selectedEmpresa.empresa}
+        empresaUbicacion={selectedEmpresa.ubicacion}
       />
     );
   }

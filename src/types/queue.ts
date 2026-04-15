@@ -22,10 +22,24 @@ export interface DeviceFingerprint {
   pixelRatio: number;
 }
 
+/** Contexto de cola para el usuario (orden FIFO por fecha de registro). */
+export interface QueueStatusColaContext {
+  /** Personas en espera delante de tu turno (solo aplica en `pendiente`). */
+  personasAntes: number;
+  /** Tu posición en la fila de espera (1 = siguiente después de los que están en taquilla). */
+  posicionEnFila: number;
+  /** Total de turnos aún en espera en esta taquilla. */
+  totalEnEspera: number;
+  /** Números que están siendo llamados/atendidos en este momento. */
+  numerosEnLlamado: number[];
+}
+
 export interface QueueStatus {
   estado: QueueTicket["estado"];
   mensaje: string;
   updatedAt: string;
+  /** Presente cuando hay datos de cola sincronizados con Centinela. */
+  cola?: QueueStatusColaContext;
 }
 
 /** Fila devuelta por GET /internal/cliente/queue/info */
