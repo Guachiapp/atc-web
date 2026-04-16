@@ -17,6 +17,8 @@
     "pm2:startup": "pm2 startup"
   },
   "dependencies": {
+    "firebase": "^12.12.0",
+    "firebase-admin": "12.7.0",
     "framer-motion": "^12.38.0",
     "ioredis": "^5.10.1",
     "lucide-react": "^1.8.0",

@@ -17,7 +17,7 @@ const featureCards = [
   {
     icon: Building2,
     title: "Cola por empresa",
-    text: "Orden claro por taquilla/oficina con posición y ETA actualizados.",
+    text: "Orden claro por ventanilla u oficina, con posición y tiempos estimados al día.",
   },
   {
     icon: ShieldCheck,

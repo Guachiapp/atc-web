@@ -24,6 +24,11 @@ export function createQueueTicketSubscriber(): Redis | null {
   }
 }
 
+/** Indica si hay `REDIS_URL` (persistencia real; sin esto el runtime usa memoria en proceso). */
+export function isRedisConfigured(): boolean {
+  return Boolean(process.env.REDIS_URL?.trim());
+}
+
 function getRedisClient(): Redis | null {
   if (redisClient) return redisClient;
   const redisUrl = process.env.REDIS_URL;
@@ -124,6 +129,79 @@ export async function rtIncrWithExpiry(key: string, windowSeconds: number): Prom
       const current = Number(memoryStore.get(key)?.value ?? "0") + 1;
       memoryStore.set(key, { value: String(current), expiresAt: Date.now() + windowSeconds * 1000 });
       return current;
+    },
+  );
+}
+
+type MemorySetEntry = { members: Set<string>; expiresAt: number | null };
+const memorySets = new Map<string, MemorySetEntry>();
+
+function cleanupMemorySet(key: string): void {
+  const e = memorySets.get(key);
+  if (!e) return;
+  if (e.expiresAt !== null && e.expiresAt <= Date.now()) memorySets.delete(key);
+}
+
+/** Añade un miembro a un set Redis (o memoria en fallback). */
+export async function rtSAdd(key: string, member: string): Promise<number> {
+  return withRedis(
+    async (redis) => {
+      return await redis.sadd(key, member);
+    },
+    () => {
+      cleanupMemorySet(key);
+      let e = memorySets.get(key);
+      if (!e) {
+        e = { members: new Set(), expiresAt: null };
+        memorySets.set(key, e);
+      }
+      if (e.members.has(member)) return 0;
+      e.members.add(member);
+      return 1;
+    },
+  );
+}
+
+export async function rtSRem(key: string, member: string): Promise<number> {
+  return withRedis(
+    async (redis) => {
+      return await redis.srem(key, member);
+    },
+    () => {
+      cleanupMemorySet(key);
+      const e = memorySets.get(key);
+      if (!e) return 0;
+      return e.members.delete(member) ? 1 : 0;
+    },
+  );
+}
+
+export async function rtSMembers(key: string): Promise<string[]> {
+  return withRedis(
+    async (redis) => {
+      return await redis.smembers(key);
+    },
+    () => {
+      cleanupMemorySet(key);
+      const e = memorySets.get(key);
+      return e ? [...e.members] : [];
+    },
+  );
+}
+
+/** Expira una clave string o set (TTL en segundos). */
+export async function rtExpire(key: string, seconds: number): Promise<void> {
+  await withRedis(
+    async (redis) => {
+      await redis.expire(key, seconds);
+    },
+    () => {
+      const e = memorySets.get(key);
+      if (e) e.expiresAt = Date.now() + seconds * 1000;
+      const str = memoryStore.get(key);
+      if (str) {
+        memoryStore.set(key, { ...str, expiresAt: Date.now() + seconds * 1000 });
+      }
     },
   );
 }

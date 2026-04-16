@@ -487,7 +487,7 @@ export function QueueJoinFlow({ qrToken }: QueueJoinFlowProps) {
       >
         <h1 className="mb-2 text-2xl font-bold text-white">Solicitar turno</h1>
         <p className="mb-6 text-slate-300">
-          Selecciona la empresa/taquilla donde deseas ser atendido.
+          Elige la empresa o ventanilla donde quieras ser atendido.
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">

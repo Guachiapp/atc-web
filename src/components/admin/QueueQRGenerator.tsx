@@ -198,7 +198,7 @@ export function QueueQRGenerator() {
             transition={{ type: "spring", damping: 25, stiffness: 250 }}
           >
             <label className="mb-1 block text-xs font-medium text-slate-400">
-              Empresa / taquilla (opcional)
+              Empresa / ventanilla (opcional)
             </label>
             <select
               value={selectValue}

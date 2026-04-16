@@ -26,9 +26,9 @@ export interface DeviceFingerprint {
 export interface QueueStatusColaContext {
   /** Personas en espera delante de tu turno (solo aplica en `pendiente`). */
   personasAntes: number;
-  /** Tu posición en la fila de espera (1 = siguiente después de los que están en taquilla). */
+  /** Tu posición en la fila de espera (1 = siguiente después de los que están en ventanilla). */
   posicionEnFila: number;
-  /** Total de turnos aún en espera en esta taquilla. */
+  /** Total de turnos aún en espera en esta ventanilla. */
   totalEnEspera: number;
   /** Números que están siendo llamados/atendidos en este momento. */
   numerosEnLlamado: number[];
@@ -63,7 +63,7 @@ export interface QueueSnapshot {
   atendidos: QueueInfoRow[];
 }
 
-/** Mensaje publicado en Redis `tickets_{userRolIdEmpresa}` (ej. al llamar turno desde taquilla). */
+/** Mensaje publicado en Redis `tickets_{userRolIdEmpresa}` (ej. al llamar turno desde ventanilla). */
 export interface QueueRedisNotification {
   type: string;
   uuid: string;

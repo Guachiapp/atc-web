@@ -61,13 +61,8 @@ export function useTicketCallNotifications(options: {
         }
       }
 
-      if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
-        try {
-          navigator.vibrate([280, 120, 280]);
-        } catch {
-          /* noop */
-        }
-      }
+      /* No usar navigator.vibrate() aquí: en Chromium solo está permitido tras un gesto del usuario
+       * (tap/click); al dispararse por poll/SSE el navegador lo bloquea y muestra [Intervention] en consola. */
     }
 
     prevEstado.current = ahora;

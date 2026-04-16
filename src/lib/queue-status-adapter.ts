@@ -72,7 +72,7 @@ export async function getQueueStatusForTicket(params: {
 
   const mensajes: Record<typeof row.estado, string> = {
     pendiente: "Tu turno está en la fila de espera.",
-    llamado: "Pasá a taquilla cuando te indiquen.",
+    llamado: "Acércate a la ventanilla cuando te llamen.",
     atendido: "Gracias por tu visita.",
   };
 

@@ -50,6 +50,8 @@ node -e "const { createHmac } = require('crypto'); const secret='TU_SESSION_SECR
 
 ## Desarrollo
 
+Gestión de dependencias con **npm** (`package-lock.json`). Evita mezclar con pnpm u otros gestores para no duplicar locks.
+
 ```bash
 npm install
 npm run dev

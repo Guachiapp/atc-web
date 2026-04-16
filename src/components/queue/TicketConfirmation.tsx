@@ -12,14 +12,18 @@ import {
   Volume2,
 } from "lucide-react";
 import { GuachiLogo } from "@/components/brand/GuachiLogo";
+import { QueueSnapshotMetrics } from "@/components/queue/QueueSnapshotMetrics";
 import { useQueueTicketStream } from "@/hooks/use-queue-ticket-stream";
+import { useFcmWebPush } from "@/hooks/use-fcm-web-push";
 import {
   requestTicketNotificationsPermission,
   useTicketCallNotifications,
 } from "@/hooks/use-ticket-call-notifications";
+import { isFcmWebPushConfigured } from "@/lib/firebase-web-config";
 import type {
   DeviceFingerprint,
   QueueRedisNotification,
+  QueueSnapshot,
   QueueStatus,
   QueueTicket,
 } from "@/types/queue";
@@ -57,9 +61,18 @@ export function TicketConfirmation({
   const router = useRouter();
   const reduceMotion = useReducedMotion();
   const releasedAssociationRef = useRef(false);
+  const releasedFcmRef = useRef(false);
+
+  const fcmPush = useFcmWebPush({
+    queueSessionToken,
+    userIdEmpresa,
+    userRolIdEmpresa,
+    ticketUuid: ticket.uuid,
+    installId: device?.installId,
+  });
   const [status, setStatus] = useState<QueueStatus>({
     estado: ticket.estado,
-    mensaje: "Tu turno está en cola",
+    mensaje: "Tu turno está en la fila",
     updatedAt: new Date().toISOString(),
   });
   const [pollError, setPollError] = useState("");
@@ -70,8 +83,39 @@ export function TicketConfirmation({
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
     typeof Notification !== "undefined" ? Notification.permission : "denied",
   );
+  const [queueSnapshot, setQueueSnapshot] = useState<QueueSnapshot | null>(null);
+  const [queueSnapshotLoading, setQueueSnapshotLoading] = useState(true);
+  const [queueSnapshotError, setQueueSnapshotError] = useState("");
 
   const empresaLine = [empresaNombre, empresaUbicacion].filter(Boolean).join(" · ");
+
+  const loadQueueSnapshot = useCallback(async () => {
+    if (!queueSessionToken) return;
+    try {
+      setQueueSnapshotError("");
+      const params = new URLSearchParams({
+        queueSessionToken,
+        userIdEmpresa: String(userIdEmpresa),
+        userRolIdEmpresa: String(userRolIdEmpresa),
+        limit: "20",
+      });
+      const res = await fetch(`/api/queue/info?${params.toString()}`);
+      const json = (await res.json()) as { success?: boolean; data?: QueueSnapshot; error?: string };
+      if (!json.success || !json.data) {
+        throw new Error(json.error || "No se pudo cargar la cola");
+      }
+      setQueueSnapshot(json.data);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "No se pudo cargar la cola";
+      setQueueSnapshot((prev) => {
+        if (!prev) setQueueSnapshotError(msg);
+        else console.warn("[TicketConfirmation] snapshot refresh failed", msg);
+        return prev;
+      });
+    } finally {
+      setQueueSnapshotLoading(false);
+    }
+  }, [queueSessionToken, userIdEmpresa, userRolIdEmpresa]);
 
   const pollStatus = useCallback(async () => {
     try {
@@ -116,8 +160,9 @@ export function TicketConfirmation({
         }
       }
       void pollStatus();
+      void loadQueueSnapshot();
     },
-    [pollStatus, ticket.uuid],
+    [pollStatus, loadQueueSnapshot, ticket.uuid],
   );
 
   useQueueTicketStream(
@@ -150,18 +195,19 @@ export function TicketConfirmation({
 
   useEffect(() => {
     let active = true;
-    const poll = async () => {
+    const tick = async () => {
       if (!active) return;
       await pollStatus();
+      await loadQueueSnapshot();
     };
 
-    void poll();
-    const id = setInterval(poll, ticketLive ? 25000 : 12000);
+    void tick();
+    const id = setInterval(tick, ticketLive ? 25000 : 12000);
     return () => {
       active = false;
       clearInterval(id);
     };
-  }, [pollStatus, ticketLive]);
+  }, [pollStatus, loadQueueSnapshot, ticketLive]);
 
   /** Liberar Redis en cuanto el estado es atendido (mientras la sesión sigue válida), no al redirigir. */
   useEffect(() => {
@@ -190,6 +236,12 @@ export function TicketConfirmation({
   }, [status.estado, device, queueSessionToken, userIdEmpresa, ticket.uuid]);
 
   useEffect(() => {
+    if (status.estado !== "atendido" || releasedFcmRef.current) return;
+    releasedFcmRef.current = true;
+    void fcmPush.unregister();
+  }, [status.estado, fcmPush.unregister]);
+
+  useEffect(() => {
     if (status.estado !== "atendido") return;
     const t = window.setTimeout(() => {
       router.push("/");
@@ -207,17 +259,36 @@ export function TicketConfirmation({
     try {
       const p = await requestTicketNotificationsPermission();
       setNotifPermission(p);
+      if (p === "granted" && isFcmWebPushConfigured() && device?.installId) {
+        await fcmPush.register();
+      }
     } finally {
       setNotifBusy(false);
     }
   };
+
+  const handleActivarPushSegundoPlano = async () => {
+    setNotifBusy(true);
+    try {
+      await fcmPush.register();
+    } finally {
+      setNotifBusy(false);
+    }
+  };
+
+  const puedeMostrarPushFcm =
+    isFcmWebPushConfigured() &&
+    Boolean(device?.installId) &&
+    !esAtendido &&
+    fcmPush.state !== "registered" &&
+    fcmPush.state !== "registering";
 
   return (
     <motion.section
       initial={reduceMotion ? false : { opacity: 0, y: 14 }}
       animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
       transition={{ type: "spring", damping: 26, stiffness: 260 }}
-      className="w-full max-w-lg"
+      className="w-full max-w-2xl"
       aria-live="polite"
     >
       <div className="mb-6 flex justify-center">
@@ -225,10 +296,10 @@ export function TicketConfirmation({
       </div>
 
       {empresaLine ? (
-        <p className="mb-6 text-center text-sm text-slate-400">{empresaLine}</p>
+        <p className="mb-4 text-center text-sm text-slate-400">{empresaLine}</p>
       ) : null}
 
-      {/* —— Estado: te están llamando —— */}
+      {/* —— Turno del usuario (prioridad visual sobre la cola general) —— */}
       {esLlamado ? (
         <motion.div
           initial={reduceMotion ? false : { scale: 0.98, opacity: 0.9 }}
@@ -247,7 +318,8 @@ export function TicketConfirmation({
             </div>
             <h2 className="mb-2 text-2xl font-bold text-white md:text-3xl">¡Te están llamando!</h2>
             <p className="mb-6 text-base text-slate-200">
-              Acercate a taquilla con tu número listo. Si no escuchaste el altavoz, mostrá esta pantalla.
+              Acércate a la ventanilla con tu número a la mano. Si no escuchaste el altavoz, muestra esta
+              pantalla.
             </p>
             <motion.p
               animate={reduceMotion ? undefined : { scale: [1, 1.06, 1] }}
@@ -293,6 +365,26 @@ export function TicketConfirmation({
                 </span>
               ) : null}
             </p>
+            {esPendiente && cola ? (
+              <p className="mt-4 rounded-xl border border-sa-primary/25 bg-sa-primary/10 px-4 py-3 text-center text-sm leading-relaxed text-slate-200">
+                {cola.personasAntes === 0 ? (
+                  <>
+                    Nadie por delante: <strong className="text-white">eres el siguiente</strong> en espera.
+                  </>
+                ) : (
+                  <>
+                    <strong className="tabular-nums text-white">{cola.personasAntes}</strong>{" "}
+                    {cola.personasAntes === 1 ? "persona por delante" : "personas por delante"} · Lugar{" "}
+                    <strong className="text-white">#{cola.posicionEnFila}</strong> de {cola.totalEnEspera} en
+                    espera
+                  </>
+                )}
+              </p>
+            ) : esPendiente && !cola && datosListos ? (
+              <p className="mt-4 text-center text-xs text-slate-500">
+                Sincronizando tu lugar en la fila…
+              </p>
+            ) : null}
           </div>
 
           {esAtendido ? (
@@ -309,6 +401,31 @@ export function TicketConfirmation({
         </>
       )}
 
+      {/* —— Cola general de la ventanilla (GET /api/queue/info) —— */}
+      {queueSnapshotLoading ? (
+        <div className="mb-6 rounded-2xl border border-white/10 bg-white/[0.04] p-6 text-center">
+          <div className="mx-auto mb-3 h-9 w-9 animate-spin rounded-full border-2 border-sa-primary/40 border-t-sa-primary" />
+          <p className="text-sm text-slate-400">Cargando estado de la cola…</p>
+        </div>
+      ) : null}
+
+      {!queueSnapshotLoading && queueSnapshotError ? (
+        <div className="mb-6 rounded-2xl border border-sa-state-warning/30 bg-sa-state-warning/10 p-4 text-center text-sm text-slate-200">
+          {queueSnapshotError}
+        </div>
+      ) : null}
+
+      {!queueSnapshotLoading && queueSnapshot && !queueSnapshotError ? (
+        <div className="mb-6">
+          <QueueSnapshotMetrics
+            snapshot={queueSnapshot}
+            realtimeConnected={ticketLive}
+            title="Cola en la ventanilla"
+            descripcion="Los mismos datos que al escanear el código: pendientes, en llamado y atendidos recientes."
+          />
+        </div>
+      ) : null}
+
       {/* —— Panel informativo: cola (esperando) —— */}
       {!esLlamado && !esAtendido && cola && esPendiente ? (
         <div className="mb-6 space-y-4 rounded-2xl border border-white/12 bg-sa-secondary-dark/50 p-5 backdrop-blur-[12px]">
@@ -321,13 +438,13 @@ export function TicketConfirmation({
               <p className="mt-1 text-sm text-slate-300">
                 {cola.personasAntes === 0 ? (
                   <>
-                    No hay nadie delante de vos en espera: <strong className="text-white">sos el siguiente</strong>{" "}
-                    en cuanto liberen un puesto.
+                    No hay nadie delante de ti en espera: <strong className="text-white">eres el siguiente</strong>{" "}
+                    en cuanto quede libre un puesto.
                   </>
                 ) : (
                   <>
                     Hay <strong className="text-white">{cola.personasAntes}</strong>{" "}
-                    {cola.personasAntes === 1 ? "persona" : "personas"} antes que vos. Tu posición:{" "}
+                    {cola.personasAntes === 1 ? "persona" : "personas"} delante de ti. Tu posición:{" "}
                     <strong className="text-white">#{cola.posicionEnFila}</strong> de {cola.totalEnEspera} en espera.
                   </>
                 )}
@@ -338,7 +455,7 @@ export function TicketConfirmation({
           <div className="border-t border-white/10 pt-4">
             <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <Radio className="h-3.5 w-3.5" aria-hidden />
-              En taquilla ahora
+              En ventanilla ahora
             </p>
             {cola.numerosEnLlamado.length > 0 ? (
               <ul className="flex flex-wrap gap-2" aria-label="Números llamados en este momento">
@@ -357,7 +474,7 @@ export function TicketConfirmation({
           </div>
 
           <p className="border-t border-white/10 pt-3 text-center text-xs text-slate-500">
-            Total en espera en esta taquilla: <strong className="text-slate-300">{cola.totalEnEspera}</strong>
+            Total en espera en esta ventanilla: <strong className="text-slate-300">{cola.totalEnEspera}</strong>
           </p>
         </div>
       ) : null}
@@ -395,10 +512,22 @@ export function TicketConfirmation({
             <div className="min-w-0 flex-1">
               <p className="font-medium text-white">Aviso cuando te llamen</p>
               <p className="mt-1 text-sm text-slate-400">
-                Si cambiás de app o apagás la pantalla, el navegador puede mostrar un aviso cuando te llamen.{" "}
-                <span className="text-slate-500">
-                  (No es notificación push con la página cerrada; en iOS puede requerir añadir el sitio a inicio.)
-                </span>
+                Con permiso, el navegador puede avisarte aunque esta pestaña no esté visible.
+                {puedeMostrarPushFcm ? (
+                  <>
+                    {" "}
+                    Si el sitio está configurado para push, también se registrará el aviso en segundo plano (página
+                    cerrada o en otra app), salvo limitaciones del dispositivo.
+                  </>
+                ) : (
+                  <>
+                    {" "}
+                    <span className="text-slate-500">
+                      Sin push en servidor, el aviso no llega con la página totalmente cerrada. En iOS suele hacer falta
+                      añadir el sitio a la pantalla de inicio.
+                    </span>
+                  </>
+                )}
               </p>
               <button
                 type="button"
@@ -415,15 +544,42 @@ export function TicketConfirmation({
       ) : null}
 
       {typeof Notification !== "undefined" && notifPermission === "granted" ? (
-        <p className="mt-4 text-center text-xs text-slate-500">
-          <Bell className="mr-1 inline h-3.5 w-3.5 text-sa-state-success" aria-hidden />
-          Avisos del navegador activados para cuando te llamen.
-        </p>
+        <div className="mt-4 space-y-3 text-center">
+          <p className="text-xs text-slate-500">
+            <Bell className="mr-1 inline h-3.5 w-3.5 text-sa-state-success" aria-hidden />
+            Avisos del navegador activados para cuando te llamen.
+          </p>
+          {puedeMostrarPushFcm ? (
+            <div className="rounded-2xl border border-white/12 bg-white/[0.04] p-4 text-left">
+              <p className="text-sm text-slate-300">
+                Activa notificaciones push en este dispositivo para recibir el aviso aunque cierres la página o cambies
+                de aplicación (mejor esfuerzo; iOS puede exigir añadir el sitio a inicio).
+              </p>
+              <button
+                type="button"
+                disabled={notifBusy}
+                onClick={() => void handleActivarPushSegundoPlano()}
+                className="mt-3 inline-flex items-center gap-2 rounded-xl border border-sa-primary/40 bg-sa-primary/15 px-4 py-2.5 text-sm font-semibold text-sa-primary-light hover:bg-sa-primary/25 disabled:opacity-50"
+              >
+                <Radio className="h-4 w-4" aria-hidden />
+                {notifBusy ? "Registrando push…" : "Activar avisos en segundo plano (push)"}
+              </button>
+            </div>
+          ) : null}
+          {fcmPush.state === "registered" ? (
+            <p className="text-xs text-slate-500">
+              Push en segundo plano registrado para este turno en este dispositivo.
+            </p>
+          ) : null}
+          {fcmPush.state === "error" && fcmPush.error ? (
+            <p className="text-xs text-sa-state-error">{fcmPush.error}</p>
+          ) : null}
+        </div>
       ) : null}
 
       {typeof Notification !== "undefined" && notifPermission === "denied" ? (
         <p className="mt-4 text-center text-xs text-slate-500">
-          Los avisos del navegador están bloqueados. Podés habilitarlos en la configuración del sitio en tu navegador.
+          Los avisos del navegador están bloqueados. Puedes activarlos en la configuración del sitio en tu navegador.
         </p>
       ) : null}
     </motion.section>
