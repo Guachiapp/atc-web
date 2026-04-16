@@ -413,6 +413,7 @@ export function QueueJoinFlow({ qrToken }: QueueJoinFlowProps) {
         userRolIdEmpresa={selectedEmpresa.userRolId}
         empresaNombre={selectedEmpresa.empresa}
         empresaUbicacion={selectedEmpresa.ubicacion}
+        device={deviceFingerprint}
       />
     );
   }

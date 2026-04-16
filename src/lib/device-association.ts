@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 import { z } from "zod";
-import { rtGet, rtSetEx } from "@/lib/redis-runtime";
+import { rtDel, rtGet, rtSetEx } from "@/lib/redis-runtime";
 import type { DeviceQueueAssociation, QueueTicket } from "@/types/queue";
 
 const DEVICE_ASSOC_TTL_SECONDS = 24 * 60 * 60;
@@ -92,4 +92,23 @@ export async function getDeviceQueueAssociation(params: {
   } catch {
     return null;
   }
+}
+
+/**
+ * Elimina la asociación dispositivo ↔ ticket (p. ej. tras atención completada)
+ * para permitir un nuevo turno al escanear el QR de nuevo.
+ */
+export async function deleteDeviceQueueAssociation(params: {
+  device: DeviceFingerprintInput;
+  condominioId: number;
+  empresaId: number;
+}): Promise<void> {
+  const parsedDevice = DeviceFingerprintSchema.parse(params.device);
+  const dHash = deviceHash(parsedDevice);
+  const key = queueDeviceKey({
+    deviceHash: dHash,
+    condominioId: params.condominioId,
+    empresaId: params.empresaId,
+  });
+  await rtDel(key);
 }

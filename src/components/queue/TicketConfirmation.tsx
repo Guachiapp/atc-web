@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   Bell,
@@ -16,7 +17,14 @@ import {
   requestTicketNotificationsPermission,
   useTicketCallNotifications,
 } from "@/hooks/use-ticket-call-notifications";
-import type { QueueRedisNotification, QueueStatus, QueueTicket } from "@/types/queue";
+import type {
+  DeviceFingerprint,
+  QueueRedisNotification,
+  QueueStatus,
+  QueueTicket,
+} from "@/types/queue";
+
+const REDIRECT_HOME_AFTER_ATENDIDO_MS = 4000;
 
 interface TicketConfirmationProps {
   ticket: QueueTicket;
@@ -25,6 +33,8 @@ interface TicketConfirmationProps {
   userRolIdEmpresa: number;
   empresaNombre?: string;
   empresaUbicacion?: string;
+  /** Huella del dispositivo; necesaria para liberar la asociación en servidor al terminar. */
+  device: DeviceFingerprint | null;
 }
 
 function formatHorario(iso: string) {
@@ -42,7 +52,9 @@ export function TicketConfirmation({
   userRolIdEmpresa,
   empresaNombre,
   empresaUbicacion,
+  device,
 }: TicketConfirmationProps) {
+  const router = useRouter();
   const reduceMotion = useReducedMotion();
   const [status, setStatus] = useState<QueueStatus>({
     estado: ticket.estado,
@@ -150,6 +162,36 @@ export function TicketConfirmation({
     };
   }, [pollStatus, ticketLive]);
 
+  useEffect(() => {
+    if (status.estado !== "atendido") return;
+    const t = window.setTimeout(() => {
+      void (async () => {
+        if (device) {
+          try {
+            const res = await fetch("/api/queue/device/ticket/clear", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                queueSessionToken,
+                userIdEmpresa,
+                ticketUuid: ticket.uuid,
+                device,
+              }),
+            });
+            if (!res.ok) {
+              const json = (await res.json().catch(() => null)) as { error?: string } | null;
+              console.warn("[TicketConfirmation] clear device association", res.status, json?.error);
+            }
+          } catch (err) {
+            console.warn("[TicketConfirmation] clear device association failed", err);
+          }
+        }
+        router.push("/");
+      })();
+    }, REDIRECT_HOME_AFTER_ATENDIDO_MS);
+    return () => window.clearTimeout(t);
+  }, [status.estado, device, queueSessionToken, userIdEmpresa, ticket.uuid, router]);
+
   const cola = status.cola;
   const esLlamado = status.estado === "llamado";
   const esAtendido = status.estado === "atendido";
@@ -253,6 +295,10 @@ export function TicketConfirmation({
               <CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-sa-state-success" aria-hidden />
               <h3 className="text-xl font-semibold text-white">Atención completada</h3>
               <p className="mt-2 text-sm text-slate-300">Gracias por usar el turno digital Guachi.</p>
+              <p className="mt-4 text-sm font-medium text-sa-primary-light">
+                Te llevamos al inicio en unos segundos para que puedas tomar un nuevo turno cuando lo
+                necesites.
+              </p>
             </div>
           ) : null}
         </>
