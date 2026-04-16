@@ -75,6 +75,26 @@ export async function rtSetEx(key: string, seconds: number, value: string): Prom
   );
 }
 
+/**
+ * SET key value EX seconds NX — devuelve true solo si la clave no existía (primera emisión).
+ * Útil para deduplicar eventos entre varias réplicas del servidor.
+ */
+export async function rtSetNxEx(key: string, seconds: number, value: string = "1"): Promise<boolean> {
+  return withRedis(
+    async (redis) => {
+      const r = await redis.set(key, value, "EX", seconds, "NX");
+      return r === "OK";
+    },
+    () => {
+      cleanupMemoryKey(key);
+      const existing = memoryStore.get(key);
+      if (existing && !isExpired(existing)) return false;
+      memoryStore.set(key, { value, expiresAt: Date.now() + seconds * 1000 });
+      return true;
+    },
+  );
+}
+
 export async function rtSet(key: string, value: string): Promise<void> {
   await withRedis(
     async (redis) => {
