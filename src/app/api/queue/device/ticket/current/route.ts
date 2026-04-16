@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { assertQueueSessionAccess } from "@/lib/queue-qr-tokens";
-import { DeviceFingerprintSchema, getDeviceQueueAssociation } from "@/lib/device-association";
+import {
+  DeviceFingerprintSchema,
+  deleteDeviceQueueAssociation,
+  getDeviceQueueAssociation,
+} from "@/lib/device-association";
+import { getQueueStatusForTicket } from "@/lib/queue-status-adapter";
 
 const BodySchema = z.object({
   queueSessionToken: z.string().min(1),
@@ -46,6 +51,26 @@ export async function POST(request: NextRequest) {
     if (!assoc) {
       return NextResponse.json({ success: true, data: null });
     }
+
+    // Si el turno ya fue atendido en Centinela, no reutilizar la copia en Redis (p. ej. clear falló o sesión caducó).
+    try {
+      const live = await getQueueStatusForTicket({
+        ticketUuid: assoc.ticket.uuid,
+        userEmpresaId: parsed.data.userIdEmpresa,
+        userEmpresaRolId: assoc.userRolIdEmpresa,
+      });
+      if (live.estado === "atendido") {
+        await deleteDeviceQueueAssociation({
+          device: parsed.data.device,
+          condominioId: session.condominioId,
+          empresaId: parsed.data.userIdEmpresa,
+        });
+        return NextResponse.json({ success: true, data: null });
+      }
+    } catch (statusErr) {
+      console.warn("[queue/device/ticket/current] no se pudo validar estado upstream; se devuelve asociación", statusErr);
+    }
+
     return NextResponse.json({
       success: true,
       data: {

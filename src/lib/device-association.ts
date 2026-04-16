@@ -21,7 +21,16 @@ function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
+/**
+ * Clave estable por navegador/perfil. No usar dimensiones de pantalla: cambian con zoom,
+ * barra de URL móvil u orientación y provocaban que `clear` y `current` apuntaran a claves distintas.
+ */
 function deviceHash(device: DeviceFingerprintInput): string {
+  return sha256(device.installId.trim());
+}
+
+/** Hash previo (pantalla + DPR); solo para leer/borrar datos guardados antes del cambio de clave. */
+function legacyDeviceHash(device: DeviceFingerprintInput): string {
   return sha256(
     [
       device.installId.trim(),
@@ -86,9 +95,27 @@ export async function getDeviceQueueAssociation(params: {
     empresaId: params.empresaId,
   });
   const raw = await rtGet(key);
-  if (!raw) return null;
+  if (raw) {
+    try {
+      return JSON.parse(raw) as DeviceQueueAssociation;
+    } catch {
+      return null;
+    }
+  }
+
+  const legacyKey = queueDeviceKey({
+    deviceHash: legacyDeviceHash(parsedDevice),
+    condominioId: params.condominioId,
+    empresaId: params.empresaId,
+  });
+  const legacyRaw = await rtGet(legacyKey);
+  if (!legacyRaw) return null;
   try {
-    return JSON.parse(raw) as DeviceQueueAssociation;
+    const assoc = JSON.parse(legacyRaw) as DeviceQueueAssociation;
+    // Migrar a la clave nueva para próximas lecturas/borrados coherentes
+    await rtSetEx(key, DEVICE_ASSOC_TTL_SECONDS, legacyRaw);
+    await rtDel(legacyKey);
+    return assoc;
   } catch {
     return null;
   }
@@ -110,5 +137,10 @@ export async function deleteDeviceQueueAssociation(params: {
     condominioId: params.condominioId,
     empresaId: params.empresaId,
   });
-  await rtDel(key);
+  const legacyKey = queueDeviceKey({
+    deviceHash: legacyDeviceHash(parsedDevice),
+    condominioId: params.condominioId,
+    empresaId: params.empresaId,
+  });
+  await Promise.all([rtDel(key), rtDel(legacyKey)]);
 }

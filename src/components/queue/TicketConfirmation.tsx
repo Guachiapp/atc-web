@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import {
@@ -56,6 +56,7 @@ export function TicketConfirmation({
 }: TicketConfirmationProps) {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
+  const releasedAssociationRef = useRef(false);
   const [status, setStatus] = useState<QueueStatus>({
     estado: ticket.estado,
     mensaje: "Tu turno está en cola",
@@ -162,35 +163,39 @@ export function TicketConfirmation({
     };
   }, [pollStatus, ticketLive]);
 
+  /** Liberar Redis en cuanto el estado es atendido (mientras la sesión sigue válida), no al redirigir. */
+  useEffect(() => {
+    if (status.estado !== "atendido" || !device || releasedAssociationRef.current) return;
+    releasedAssociationRef.current = true;
+    void (async () => {
+      try {
+        const res = await fetch("/api/queue/device/ticket/clear", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            queueSessionToken,
+            userIdEmpresa,
+            ticketUuid: ticket.uuid,
+            device,
+          }),
+        });
+        if (!res.ok) {
+          const json = (await res.json().catch(() => null)) as { error?: string } | null;
+          console.warn("[TicketConfirmation] clear device association", res.status, json?.error);
+        }
+      } catch (err) {
+        console.warn("[TicketConfirmation] clear device association failed", err);
+      }
+    })();
+  }, [status.estado, device, queueSessionToken, userIdEmpresa, ticket.uuid]);
+
   useEffect(() => {
     if (status.estado !== "atendido") return;
     const t = window.setTimeout(() => {
-      void (async () => {
-        if (device) {
-          try {
-            const res = await fetch("/api/queue/device/ticket/clear", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                queueSessionToken,
-                userIdEmpresa,
-                ticketUuid: ticket.uuid,
-                device,
-              }),
-            });
-            if (!res.ok) {
-              const json = (await res.json().catch(() => null)) as { error?: string } | null;
-              console.warn("[TicketConfirmation] clear device association", res.status, json?.error);
-            }
-          } catch (err) {
-            console.warn("[TicketConfirmation] clear device association failed", err);
-          }
-        }
-        router.push("/");
-      })();
+      router.push("/");
     }, REDIRECT_HOME_AFTER_ATENDIDO_MS);
     return () => window.clearTimeout(t);
-  }, [status.estado, device, queueSessionToken, userIdEmpresa, ticket.uuid, router]);
+  }, [status.estado, router]);
 
   const cola = status.cola;
   const esLlamado = status.estado === "llamado";
