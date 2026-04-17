@@ -4,7 +4,7 @@ export function SiteFooter() {
   return (
     <footer className="border-t border-white/10 bg-sa-secondary-dark py-10 text-center">
       <p className="text-sm font-medium text-slate-200">
-        Guachi Smart Access — ATC
+        Guachi — ATC
       </p>
       <p className="mt-2 text-xs text-slate-400">
         Parte del ecosistema{" "}

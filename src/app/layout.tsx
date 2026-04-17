@@ -11,14 +11,14 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Guachi ATC | Turnos y colas digitales",
   description:
-    "Módulo de atención al cliente y gestión de colas para empresas. Parte de Guachi Smart Access.",
+    "Cola por QR en recepción, turno con datos de Centinela, actualización en vivo (SSE) y avisos por notificación. Portal admin para generar códigos. Guachi.",
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   ),
   openGraph: {
     title: "Guachi ATC | Turnos y colas digitales",
     description:
-      "Solicita tu turno escaneando el QR en recepción. Experiencia Guachi Smart Access.",
+      "Toma tu turno desde el QR, sigue la cola en vivo y recibe avisos en el navegador. Guachi.",
     type: "website",
     locale: "es_VE",
     siteName: "Guachi",

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
-import { Building2, QrCode, ShieldCheck, Smartphone } from "lucide-react";
+import { Bell, QrCode, Radio, Smartphone, ShieldCheck } from "lucide-react";
 import { GuachiLogo } from "@/components/brand/GuachiLogo";
 import { SiteFooter } from "@/components/brand/SiteFooter";
 import { QueueDashboard } from "@/components/queue/QueueDashboard";
@@ -11,18 +11,23 @@ import { QueueDashboard } from "@/components/queue/QueueDashboard";
 const featureCards = [
   {
     icon: QrCode,
-    title: "QR seguro y rápido",
-    text: "Ingreso en segundos con token firmado y validación server-side.",
+    title: "Ingreso por QR en recepción",
+    text: "El visitante abre el enlace del código (token firmado). Sesión de cola efímera, enlazada al dispositivo cuando aplica.",
   },
   {
-    icon: Building2,
-    title: "Cola por empresa",
-    text: "Orden claro por ventanilla u oficina, con posición y tiempos estimados al día.",
+    icon: Radio,
+    title: "Cola en vivo y turno",
+    text: "Vista previa de la fila con datos de la API Centinela; canal en tiempo real (SSE) mientras esperas tu número.",
+  },
+  {
+    icon: Bell,
+    title: "Avisos en el navegador",
+    text: "Avisos cuando te llaman o falta poco; puedes activarlos desde la pantalla de tu turno.",
   },
   {
     icon: ShieldCheck,
-    title: "Operación confiable",
-    text: "Rate limit, anti-enumeración y telemetría para soporte ATC.",
+    title: "Protección y operación",
+    text: "CAPTCHA adaptativo, rate limiting y cabeceras internas hacia el backend; pensado para integrarse con el resto de productos Guachi.",
   },
 ];
 
@@ -39,17 +44,11 @@ export default function Home() {
           <nav className="flex items-center gap-3 text-sm">
             <Link
               href="https://www.guachiapp.com"
-              className="hidden text-slate-300 hover:text-sa-primary-light sm:inline"
+              className="text-slate-300 hover:text-sa-primary-light"
               target="_blank"
               rel="noopener noreferrer"
             >
-              Guachi Smart Access
-            </Link>
-            <Link
-              href="/admin/login"
-              className="rounded-xl border border-white/20 bg-white/5 px-3 py-2 font-medium text-white hover:border-sa-primary/50"
-            >
-              Admin
+              Guachi
             </Link>
           </nav>
         </div>
@@ -71,14 +70,15 @@ export default function Home() {
             <div className="grid items-center gap-8 lg:grid-cols-[1.2fr_1fr]">
               <div>
                 <p className="mb-3 inline-flex rounded-full border border-sa-primary/45 bg-sa-primary/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sa-primary-light">
-                  Queue Intelligence · Mobile First
+                  Cola digital · Guachi
                 </p>
                 <h1 className="mb-4 text-3xl font-semibold leading-tight sm:text-4xl md:text-5xl">
-                  Gestión ATC con experiencia fluida y enfoque operativo
+                  Turnos y filas de atención, desde el QR hasta el aviso en el móvil
                 </h1>
                 <p className="max-w-xl text-base text-slate-300 sm:text-lg">
-                  Dashboard en tiempo real, prioridades visibles y micro-interacciones que guían la
-                  atención. Diseño alineado a principios HIG: claridad, feedback continuo y foco.
+                  Los visitantes entran con el código en recepción, eligen empresa cuando el QR no fija una
+                  sola, revisan la cola, toman su número y pueden activar notificaciones para saber cuándo los
+                  llaman, sin depender de la ventana del navegador abierta.
                 </p>
                 <div className="mt-6 flex flex-wrap items-center gap-3">
                   <a
@@ -88,14 +88,8 @@ export default function Home() {
                     rel="noopener noreferrer"
                   >
                     <Smartphone className="h-4 w-4" />
-                    Ver ecosistema Guachi
+                    Conocer Guachi
                   </a>
-                  <Link
-                    href="/admin/login"
-                    className="rounded-2xl border border-white/20 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-sa-primary/60"
-                  >
-                    Ir al portal ATC
-                  </Link>
                 </div>
               </div>
 
@@ -125,7 +119,7 @@ export default function Home() {
             }}
             initial={reduceMotion ? false : "hidden"}
             animate={reduceMotion ? undefined : "show"}
-            className="grid gap-3 sm:grid-cols-3"
+            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
           >
             {featureCards.map(({ icon: Icon, title, text }) => (
               <motion.article

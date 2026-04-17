@@ -1,6 +1,6 @@
 # Guachi ATC Web
 
-Módulo web de ATC/gestión de colas para empresas integrado al ecosistema Guachi.
+Módulo web de ATC/gestión de colas para empresas; parte del producto Guachi.
 
 ## Funcionalidades MVP implementadas
 
