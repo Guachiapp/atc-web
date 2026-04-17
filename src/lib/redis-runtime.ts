@@ -209,6 +209,23 @@ export async function rtSMembers(key: string): Promise<string[]> {
   );
 }
 
+/** SCAN MATCH (solo Redis real; en fallback memoria devuelve []). */
+export async function rtScanKeys(match: string): Promise<string[]> {
+  return withRedis(
+    async (redis) => {
+      const keys: string[] = [];
+      let cursor = "0";
+      do {
+        const [next, batch] = await redis.scan(cursor, "MATCH", match, "COUNT", 200);
+        cursor = next;
+        keys.push(...batch);
+      } while (cursor !== "0");
+      return keys;
+    },
+    () => [],
+  );
+}
+
 /** Expira una clave string o set (TTL en segundos). */
 export async function rtExpire(key: string, seconds: number): Promise<void> {
   await withRedis(

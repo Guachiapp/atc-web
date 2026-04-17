@@ -9,9 +9,9 @@ import {
   Radio,
   Sparkles,
   Users,
-  Volume2,
 } from "lucide-react";
 import { GuachiLogo } from "@/components/brand/GuachiLogo";
+import { TicketNotificationPromptModal } from "@/components/queue/TicketNotificationPromptModal";
 import { QueueSnapshotMetrics } from "@/components/queue/QueueSnapshotMetrics";
 import { useQueueTicketStream } from "@/hooks/use-queue-ticket-stream";
 import { useFcmWebPush } from "@/hooks/use-fcm-web-push";
@@ -20,6 +20,11 @@ import {
   useTicketCallNotifications,
 } from "@/hooks/use-ticket-call-notifications";
 import { isFcmWebPushConfigured } from "@/lib/firebase-web-config";
+import {
+  recordNotifPromptGranted,
+  recordNotifPromptSnoozed,
+  shouldShowNotificationPromptModal,
+} from "@/lib/atc-notif-prompt-storage";
 import type {
   DeviceFingerprint,
   QueueRedisNotification,
@@ -92,6 +97,7 @@ export function TicketConfirmation({
   const [queueSnapshot, setQueueSnapshot] = useState<QueueSnapshot | null>(null);
   const [queueSnapshotLoading, setQueueSnapshotLoading] = useState(true);
   const [queueSnapshotError, setQueueSnapshotError] = useState("");
+  const [notifModalOpen, setNotifModalOpen] = useState(false);
 
   const empresaLine = [empresaNombre, empresaUbicacion].filter(Boolean).join(" · ");
 
@@ -223,6 +229,14 @@ export function TicketConfirmation({
     }
   }, []);
 
+  /** Modal al tomar turno: permisos visibles sin depender del scroll (móvil). */
+  useEffect(() => {
+    if (typeof Notification === "undefined") return;
+    if (!shouldShowNotificationPromptModal()) return;
+    const t = window.setTimeout(() => setNotifModalOpen(true), 450);
+    return () => window.clearTimeout(t);
+  }, []);
+
   useEffect(() => {
     let active = true;
     const tick = async () => {
@@ -284,17 +298,33 @@ export function TicketConfirmation({
   const esAtendido = status.estado === "atendido";
   const esPendiente = status.estado === "pendiente";
 
-  const handleActivarNotificaciones = async () => {
+  const runNotifPermissionAndFcm = useCallback(async () => {
+    const p = await requestTicketNotificationsPermission();
+    setNotifPermission(p);
+    if (p === "granted" && isFcmWebPushConfigured() && device?.installId) {
+      await fcmPush.register();
+    }
+    return p;
+  }, [device?.installId, fcmPush]);
+
+  const handleModalActivateNotificaciones = async () => {
     setNotifBusy(true);
     try {
-      const p = await requestTicketNotificationsPermission();
-      setNotifPermission(p);
-      if (p === "granted" && isFcmWebPushConfigured() && device?.installId) {
-        await fcmPush.register();
+      const p = await runNotifPermissionAndFcm();
+      if (p === "granted") {
+        recordNotifPromptGranted();
+      } else {
+        recordNotifPromptSnoozed(7);
       }
+      setNotifModalOpen(false);
     } finally {
       setNotifBusy(false);
     }
+  };
+
+  const handleModalDismissNotificaciones = () => {
+    recordNotifPromptSnoozed(14);
+    setNotifModalOpen(false);
   };
 
   const handleActivarPushSegundoPlano = async () => {
@@ -321,6 +351,14 @@ export function TicketConfirmation({
       className="w-full max-w-2xl"
       aria-live="polite"
     >
+      <TicketNotificationPromptModal
+        open={notifModalOpen}
+        busy={notifBusy}
+        fcmConfigured={isFcmWebPushConfigured()}
+        onActivate={handleModalActivateNotificaciones}
+        onDismiss={handleModalDismissNotificaciones}
+      />
+
       <div className="mb-6 flex justify-center">
         <GuachiLogo variant="white" width={168} height={42} />
       </div>
@@ -531,47 +569,6 @@ export function TicketConfirmation({
           <p className="mt-3 border-t border-white/10 pt-3 text-sm text-sa-state-error">{pollError}</p>
         ) : null}
       </div>
-
-      {/* —— Avisos del navegador (no reemplaza push con app cerrada) —— */}
-      {typeof Notification !== "undefined" && notifPermission === "default" ? (
-        <div className="mt-5 rounded-2xl border border-white/15 bg-white/[0.06] p-4">
-          <div className="flex gap-3">
-            <div className="shrink-0 rounded-lg bg-sa-primary/20 p-2 text-sa-primary-light">
-              <Bell className="h-5 w-5" aria-hidden />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="font-medium text-white">Aviso cuando te llamen</p>
-              <p className="mt-1 text-sm text-slate-400">
-                Con permiso, el navegador puede avisarte aunque esta pestaña no esté visible.
-                {puedeMostrarPushFcm ? (
-                  <>
-                    {" "}
-                    Si el sitio está configurado para push, también se registrará el aviso en segundo plano (página
-                    cerrada o en otra app), salvo limitaciones del dispositivo.
-                  </>
-                ) : (
-                  <>
-                    {" "}
-                    <span className="text-slate-500">
-                      Sin push en servidor, el aviso no llega con la página totalmente cerrada. En iOS suele hacer falta
-                      añadir el sitio a la pantalla de inicio.
-                    </span>
-                  </>
-                )}
-              </p>
-              <button
-                type="button"
-                disabled={notifBusy}
-                onClick={() => void handleActivarNotificaciones()}
-                className="mt-3 inline-flex items-center gap-2 rounded-xl bg-sa-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-sa-primary-dark disabled:opacity-50"
-              >
-                <Volume2 className="h-4 w-4" aria-hidden />
-                {notifBusy ? "Abriendo permisos…" : "Activar avisos del navegador"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       {typeof Notification !== "undefined" && notifPermission === "granted" ? (
         <div className="mt-4 space-y-3 text-center">

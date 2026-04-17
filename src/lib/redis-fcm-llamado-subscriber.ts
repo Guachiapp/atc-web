@@ -1,6 +1,10 @@
 import type Redis from "ioredis";
 import { sendFcmToTokens, isFcmConfigured } from "@/lib/fcm-admin";
 import { collectFcmTokensForTicket } from "@/lib/push-token-store";
+import {
+  parseUserRolIdEmpresaFromTicketsChannel,
+  runCasiTuTurnoCheckForVentanilla,
+} from "@/lib/redis-fcm-casi-tu-turno";
 import { createQueueTicketSubscriber, isRedisConfigured, rtSetNxEx } from "@/lib/redis-runtime";
 
 const CHANNEL_PATTERN = "tickets_*";
@@ -104,6 +108,12 @@ export function startRedisFcmLlamadoSubscriber(): void {
     void handleTicketsChannelMessage(channel, message).catch((e) => {
       console.error("[redis-fcm-llamado] handleTicketsChannelMessage", e);
     });
+    const ventanillaId = parseUserRolIdEmpresaFromTicketsChannel(channel);
+    if (ventanillaId != null) {
+      void runCasiTuTurnoCheckForVentanilla(ventanillaId).catch((e) => {
+        console.error("[redis-fcm-casi5] runCasiTuTurnoCheckForVentanilla", e);
+      });
+    }
   };
 
   sub.on("pmessage", onPMessage);

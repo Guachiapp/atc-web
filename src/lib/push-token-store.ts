@@ -1,5 +1,14 @@
 import { createHash } from "crypto";
-import { rtDel, rtExpire, rtGet, rtSAdd, rtSMembers, rtSRem, rtSetEx } from "@/lib/redis-runtime";
+import {
+  rtDel,
+  rtExpire,
+  rtGet,
+  rtSAdd,
+  rtSMembers,
+  rtSRem,
+  rtScanKeys,
+  rtSetEx,
+} from "@/lib/redis-runtime";
 
 const PUSH_REG_TTL_SECONDS = 24 * 60 * 60;
 const MAX_TOKENS_PER_DEVICE = 3;
@@ -105,6 +114,38 @@ export async function removeFcmToken(params: { installId: string; fcmToken?: str
     await rtDel(key);
     await rtSRem(ticketInstallsKey(params.ticketUuid), dhash(params.installId));
   }
+}
+
+const TICKET_INDEX_PREFIX = "atc:push:ticket:";
+
+/** UUIDs que tienen al menos un registro FCM en el índice `atc:push:ticket:{uuid}`. */
+export async function listTicketUuidsWithPushIndex(): Promise<string[]> {
+  const keys = await rtScanKeys(`${TICKET_INDEX_PREFIX}*`);
+  return keys.map((k) => k.slice(TICKET_INDEX_PREFIX.length)).filter((u) => u.length > 0);
+}
+
+/** Contexto de sesión guardado al registrar push (para consultar Centinela con los mismos IDs). */
+export async function getPushRegistrationContextForTicket(ticketUuid: string): Promise<{
+  userEmpresaId: number;
+  userRolIdEmpresa: number;
+} | null> {
+  const hashes = await rtSMembers(ticketInstallsKey(ticketUuid));
+  for (const h of hashes) {
+    const raw = await rtGet(`atc:push:reg:${h}`);
+    if (!raw) continue;
+    try {
+      const record = JSON.parse(raw) as PushRegistrationRecord;
+      if (record.ticketUuid === ticketUuid && record.fcmTokens.length > 0) {
+        return {
+          userEmpresaId: record.userEmpresaId,
+          userRolIdEmpresa: record.userRolIdEmpresa,
+        };
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return null;
 }
 
 /** Obtiene todos los tokens FCM asociados a un ticket (varios dispositivos / reintentos). */
