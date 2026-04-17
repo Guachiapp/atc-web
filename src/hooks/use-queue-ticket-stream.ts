@@ -38,7 +38,7 @@ export function useQueueTicketStream(
     userRolIdEmpresa: number;
     enabled: boolean;
   },
-  onQueuePayload: (payload: QueueRedisNotification) => void,
+  onQueuePayload: (payload: QueueRedisNotification) => void | Promise<void>,
   options?: {
     onOpen?: () => void;
     onConnectionLost?: () => void;

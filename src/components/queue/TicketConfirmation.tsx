@@ -30,6 +30,12 @@ import type {
 
 const REDIRECT_HOME_AFTER_ATENDIDO_MS = 4000;
 
+/** Evento INFO del pub/sub Redis cuando ya no quedan turnos por atender (p. ej. cierre de cola). */
+function isInfoColaSinPendientes(info: string | undefined): boolean {
+  if (!info || typeof info !== "string") return false;
+  return info.trim().toLowerCase().includes("no hay números sin atender");
+}
+
 interface TicketConfirmationProps {
   ticket: QueueTicket;
   queueSessionToken: string;
@@ -117,7 +123,7 @@ export function TicketConfirmation({
     }
   }, [queueSessionToken, userIdEmpresa, userRolIdEmpresa]);
 
-  const pollStatus = useCallback(async () => {
+  const pollStatus = useCallback(async (): Promise<QueueStatus | null> => {
     try {
       const params = new URLSearchParams({
         queueSessionToken,
@@ -138,29 +144,53 @@ export function TicketConfirmation({
         setPollError("");
         setStatus(json.data);
         setDatosListos(true);
-        return;
+        return json.data;
       }
       const msg = [json.error, json.hint].filter(Boolean).join(" — ") || `Error ${res.status}`;
       setPollError(msg);
       if (res.status !== 403) {
         console.warn("[TicketConfirmation] poll no ok", res.status, json);
       }
+      return null;
     } catch (error) {
       console.error("[TicketConfirmation] poll error", error);
       setPollError("No se pudo actualizar el estado. Revisa la conexión.");
+      return null;
     }
   }, [ticket.uuid, queueSessionToken, userIdEmpresa, userRolIdEmpresa]);
 
   const onStreamPayload = useCallback(
-    (payload: QueueRedisNotification) => {
+    async (payload: QueueRedisNotification) => {
       const tipo = String(payload.type || "").toUpperCase();
       if (payload.uuid === ticket.uuid && tipo === "LLAMADO") {
         if (payload.puesto != null && String(payload.puesto).trim() !== "") {
           setPuestoHint(String(payload.puesto).trim());
         }
       }
-      void pollStatus();
-      void loadQueueSnapshot();
+
+      const latest = await pollStatus();
+      await loadQueueSnapshot();
+
+      /**
+       * INFO "No hay números sin atender": si el cliente seguía en llamado (en ventanilla),
+       * el backend puede no haber persistido aún `atendido`; alineamos UI y efectos (clear, FCM, redirect).
+       */
+      if (
+        tipo === "INFO" &&
+        isInfoColaSinPendientes(payload.info) &&
+        latest?.estado === "llamado"
+      ) {
+        setStatus((s) =>
+          s.estado === "llamado"
+            ? {
+                ...s,
+                estado: "atendido",
+                mensaje: "Tu atención ha finalizado. Gracias por tu visita.",
+                updatedAt: new Date().toISOString(),
+              }
+            : s,
+        );
+      }
     },
     [pollStatus, loadQueueSnapshot, ticket.uuid],
   );

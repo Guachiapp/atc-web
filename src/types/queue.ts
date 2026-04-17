@@ -66,9 +66,11 @@ export interface QueueSnapshot {
 /** Mensaje publicado en Redis `tickets_{userRolIdEmpresa}` (ej. al llamar turno desde ventanilla). */
 export interface QueueRedisNotification {
   type: string;
-  uuid: string;
-  numero: number;
+  uuid?: string;
+  numero?: number;
   puesto?: string | number;
+  /** Mensajes informativos (p. ej. cola sin pendientes). */
+  info?: string;
 }
 
 export interface DeviceQueueAssociation {
