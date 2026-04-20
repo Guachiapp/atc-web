@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getClientIp } from "@/lib/request-ip";
 import { z } from "zod";
 import { evaluateEnumeration } from "@/lib/anti-enumeration";
 import { assertQueueSessionAccess } from "@/lib/queue-qr-tokens";
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const antiEnum = evaluateEnumeration(ip, session.condominioId);
+  const antiEnum = await evaluateEnumeration(ip, session.condominioId);
   if (!antiEnum.allowed) {
     return new Response(JSON.stringify({ success: false, error: "Acceso bloqueado" }), {
       status: 429,

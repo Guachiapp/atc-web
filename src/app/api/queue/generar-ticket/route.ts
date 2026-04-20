@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getClientIp } from "@/lib/request-ip";
 import { z } from "zod";
 import { enforceAdaptiveCaptcha } from "@/lib/adaptive-captcha";
 import { checkRateLimit } from "@/lib/rate-limiter";

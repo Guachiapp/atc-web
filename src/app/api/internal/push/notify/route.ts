@@ -2,13 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { sendFcmToTokens, isFcmConfigured } from "@/lib/fcm-admin";
 import { collectFcmTokensForTicket } from "@/lib/push-token-store";
-
-function internalKeyOk(request: NextRequest): boolean {
-  const expected = process.env.API_INTERNAL_KEY?.trim();
-  if (!expected) return false;
-  const got = request.headers.get("x-internal-key")?.trim();
-  return got === expected;
-}
+import { requireInternalAuth } from "@/lib/internal-guard";
 
 const BodySchema = z.object({
   ticketUuid: z.string().uuid(),
@@ -22,9 +16,8 @@ const BodySchema = z.object({
  * Llamar desde Centinela, un worker Redis o proceso batch, con `X-Internal-Key`.
  */
 export async function POST(request: NextRequest) {
-  if (!internalKeyOk(request)) {
-    return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
-  }
+  const authResponse = requireInternalAuth(request);
+  if (authResponse) return authResponse;
   if (!isFcmConfigured()) {
     return NextResponse.json(
       { success: false, error: "FCM no configurado en el servidor", code: "FCM_DISABLED" },

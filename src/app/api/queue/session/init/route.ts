@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getClientIp } from "@/lib/request-ip";
 import { z } from "zod";
 import { checkRateLimit } from "@/lib/rate-limiter";
 import { enforceAdaptiveCaptcha } from "@/lib/adaptive-captcha";
@@ -12,7 +13,7 @@ const Schema = z.object({
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
   const userAgent = request.headers.get("user-agent") || "unknown";
-  const limit = checkRateLimit(`queue:init:${ip}`, { maxRequests: 20, windowSeconds: 300 });
+  const limit = await checkRateLimit(`queue:init:${ip}`, { maxRequests: 20, windowSeconds: 300 });
   if (!limit.allowed) {
     return NextResponse.json({ success: false, error: "Límite de intentos excedido" }, { status: 429 });
   }

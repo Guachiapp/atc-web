@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getClientIp } from "@/lib/request-ip";
 import { z } from "zod";
 import { assertQueueSessionAccess } from "@/lib/queue-qr-tokens";
 import { fetchQueueUnidades } from "@/lib/queue-api";
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Sesión inválida" }, { status: 403 });
   }
 
-  const antiEnum = evaluateEnumeration(ip, session.condominioId);
+  const antiEnum = await evaluateEnumeration(ip, session.condominioId);
   if (!antiEnum.allowed) {
     return NextResponse.json({ success: false, error: "Acceso bloqueado" }, { status: 429 });
   }

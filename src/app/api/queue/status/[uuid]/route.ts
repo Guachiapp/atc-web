@@ -3,6 +3,7 @@
  * Hacia Centinela, `getQueueStatusForTicket` → `fetchQueueInfo` sí envía X-Internal-Key; un fallo upstream sería 502, no 403.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { getClientIp } from "@/lib/request-ip";
 import { z } from "zod";
 import { assertQueueSessionAccess } from "@/lib/queue-qr-tokens";
 import { getQueueStatusForTicket } from "@/lib/queue-status-adapter";

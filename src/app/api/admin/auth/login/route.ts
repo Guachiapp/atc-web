@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getClientIp } from "@/lib/request-ip";
 import { z } from "zod";
 import { checkRateLimit } from "@/lib/rate-limiter";
 import { checkLoginRateLimit, createAdminSession, createAdminToken, verifyAdminPassword } from "@/lib/admin-auth";
@@ -12,7 +13,7 @@ const SESSION_TTL_SECONDS = 8 * 60 * 60;
 
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
-  const ipBurstLimit = checkRateLimit(`admin:login:burst:${ip}`, { maxRequests: 30, windowSeconds: 60 });
+  const ipBurstLimit = await checkRateLimit(`admin:login:burst:${ip}`, { maxRequests: 30, windowSeconds: 60 });
   if (!ipBurstLimit.allowed) {
     return NextResponse.json(
       { success: false, error: "Demasiados intentos. Intenta luego." },

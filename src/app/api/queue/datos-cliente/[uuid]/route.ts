@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getClientIp } from "@/lib/request-ip";
 import { z } from "zod";
 import { postDatosCliente } from "@/lib/queue-api";
 import { assertQueueSessionAccess } from "@/lib/queue-qr-tokens";

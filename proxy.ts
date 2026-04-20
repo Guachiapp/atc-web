@@ -22,7 +22,7 @@ function clientIp(request: NextRequest): string {
   );
 }
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // Generar un nonce criptográfico único por request para la Content-Security-Policy.
   // El nonce se comparte con los Server Components vía el header x-nonce.
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
@@ -41,11 +41,19 @@ export function proxy(request: NextRequest) {
   Object.entries(securityHeaders).forEach(([key, value]) => response.headers.set(key, value));
 
   if (request.nextUrl.pathname.startsWith("/api/")) {
+    // Defensa en profundidad: Las rutas internas no deberían ser llamadas por clientes web directamente
+    if (request.nextUrl.pathname.startsWith("/api/internal/")) {
+      const internalKey = request.headers.get("x-internal-key") || request.headers.get("authorization")?.replace("Bearer ", "");
+      if (!internalKey) {
+        return NextResponse.json({ success: false, error: "Not Found" }, { status: 404 });
+      }
+    }
+
     const ip = clientIp(request);
     const isSensitive =
       request.nextUrl.pathname.includes("/queue/generar-ticket") ||
       request.nextUrl.pathname.includes("/admin/auth/login");
-    const result = checkRateLimit(`mw:${ip}:${isSensitive ? "s" : "n"}`, {
+    const result = await checkRateLimit(`mw:${ip}:${isSensitive ? "s" : "n"}`, {
       maxRequests: isSensitive ? 30 : 120,
       windowSeconds: 60,
     });
