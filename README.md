@@ -40,12 +40,18 @@ Debes definir:
 - `TURNSTILE_SECRET_KEY` (CAPTCHA adaptativo)
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (si se integra widget en UI)
 
+## Requisitos de Infraestructura (Proxy / IP Real)
+
+Para garantizar la seguridad de los rate-limiters y el sistema anti-enumeración, **esta aplicación debe desplegarse detrás de un proxy inverso confiable** (ej. Nginx, Cloudflare o AWS ALB) que sobrescriba y limpie cabeceras que pueden ser falsificadas (`X-Forwarded-For`).
+1. Si usas Cloudflare, la IP se tomará de `cf-connecting-ip`.
+2. Si usas Nginx o similar, asegúrate de que inyecte `X-Real-IP`. Por ejemplo: `proxy_set_header X-Real-IP $remote_addr;`.
+
 ## Generar `ADMIN_PASSWORD_HASH`
 
-El hash sigue la lógica HMAC-SHA256 con `SESSION_SECRET`.
+El hash utiliza **argon2id** para prevenir ataques de fuerza bruta. Para generar tu hash:
 
 ```bash
-node -e "const { createHmac } = require('crypto'); const secret='TU_SESSION_SECRET'; const pass='TU_PASSWORD_ADMIN'; console.log(createHmac('sha256', secret).update(pass).digest('hex'));"
+node -e "require('argon2').hash('TU_PASSWORD_ADMIN', { type: require('argon2').argon2id }).then(console.log)"
 ```
 
 ## Desarrollo
@@ -79,5 +85,4 @@ npm run start
 - **CAPTCHA adaptativo**:
   - score por riesgo/velocidad por IP y acción,
   - exige token CAPTCHA solo cuando el score supera umbral,
-  - validación contra Turnstile (`TURNSTILE_SECRET_KEY`),
-  - en desarrollo permite token `dev-bypass` si no hay secret configurado.
+  - validación contra Turnstile (`TURNSTILE_SECRET_KEY`).
