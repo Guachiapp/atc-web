@@ -38,8 +38,8 @@ export async function POST(
   try {
     const result = await postDatosCliente(uuid, {
       nombre: parsed.data.nombre ? sanitizeString(parsed.data.nombre) : undefined,
-      cedula: parsed.data.cedula ? sanitizeString(parsed.data.cedula) : undefined,
-      telefono: parsed.data.telefono ? sanitizeString(parsed.data.telefono) : undefined,
+      cedula: parsed.data.cedula ? sanitizeString(parsed.data.cedula, { strictPii: true }) : undefined,
+      telefono: parsed.data.telefono ? sanitizeString(parsed.data.telefono, { strictPii: true }) : undefined,
       correo: parsed.data.correo ? sanitizeString(parsed.data.correo) : undefined,
     });
     return NextResponse.json({ success: true, data: result });

@@ -41,6 +41,12 @@ export async function proxy(request: NextRequest) {
   Object.entries(securityHeaders).forEach(([key, value]) => response.headers.set(key, value));
 
   if (request.nextUrl.pathname.startsWith("/api/")) {
+    // L7: Límite de tamaño de cuerpo (256 KiB)
+    const contentLength = parseInt(request.headers.get("content-length") || "0");
+    if (contentLength > 256 * 1024) {
+      return NextResponse.json({ success: false, error: "Payload too large" }, { status: 413 });
+    }
+
     // Defensa en profundidad: Las rutas internas no deberían ser llamadas por clientes web directamente
     if (request.nextUrl.pathname.startsWith("/api/internal/")) {
       const internalKey = request.headers.get("x-internal-key") || request.headers.get("authorization")?.replace("Bearer ", "");

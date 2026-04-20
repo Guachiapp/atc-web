@@ -166,8 +166,35 @@ export async function rtIncrWithExpiry(key: string, windowSeconds: number): Prom
     },
     () => {
       cleanupMemoryKey(key);
-      const current = Number(memoryStore.get(key)?.value ?? "0") + 1;
+      const entry = memoryStore.get(key);
+      const current = Number(entry?.value ?? "0") + 1;
       memoryStore.set(key, { value: String(current), expiresAt: Date.now() + windowSeconds * 1000 });
+      return current;
+    },
+  );
+}
+
+export async function rtIncr(key: string): Promise<number> {
+  return withRedis(
+    async (redis) => await redis.incr(key),
+    () => {
+      cleanupMemoryKey(key);
+      const entry = memoryStore.get(key);
+      const current = Number(entry?.value ?? "0") + 1;
+      memoryStore.set(key, { value: String(current), expiresAt: entry?.expiresAt ?? null });
+      return current;
+    },
+  );
+}
+
+export async function rtDecr(key: string): Promise<number> {
+  return withRedis(
+    async (redis) => await redis.decr(key),
+    () => {
+      cleanupMemoryKey(key);
+      const entry = memoryStore.get(key);
+      const current = Math.max(0, Number(entry?.value ?? "0") - 1);
+      memoryStore.set(key, { value: String(current), expiresAt: entry?.expiresAt ?? null });
       return current;
     },
   );

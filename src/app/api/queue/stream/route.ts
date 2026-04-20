@@ -3,7 +3,7 @@ import { getClientIp } from "@/lib/request-ip";
 import { z } from "zod";
 import { evaluateEnumeration } from "@/lib/anti-enumeration";
 import { assertQueueSessionAccess } from "@/lib/queue-qr-tokens";
-import { createQueueTicketSubscriber } from "@/lib/redis-runtime";
+import { createQueueTicketSubscriber, rtDecr, rtExpire, rtIncr } from "@/lib/redis-runtime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,8 +54,22 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  // M9: Límite de conexiones concurrentes por IP
+  const activeConnKey = `atc:sse:active:${ip}`;
+  const currentConns = await rtIncr(activeConnKey);
+  await rtExpire(activeConnKey, 7200); // TTL de seguridad de 2 horas
+
+  if (currentConns > 5) {
+    await rtDecr(activeConnKey);
+    return new Response(JSON.stringify({ success: false, error: "Límite de conexiones simultáneas excedido" }), {
+      status: 429,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   const sub = createQueueTicketSubscriber();
   if (!sub) {
+    await rtDecr(activeConnKey); // Liberar contador si falla Redis
     return new Response(JSON.stringify({ success: false, error: "Tiempo real no disponible (Redis)" }), {
       status: 503,
       headers: { "Content-Type": "application/json" },
@@ -103,6 +117,8 @@ export async function GET(request: NextRequest) {
       const cleanup = () => {
         if (closed) return;
         closed = true;
+        // M9: Decrementar contador al cerrar
+        void rtDecr(activeConnKey).catch(() => {});
         if (heartbeat) {
           clearInterval(heartbeat);
           heartbeat = null;
@@ -138,6 +154,15 @@ export async function GET(request: NextRequest) {
             cleanup();
           }
         }, 25000);
+
+        // M9: Timeout máximo de conexión (30 minutos)
+        setTimeout(() => {
+          if (!closed) {
+            send({ channel: "system", type: "TIMEOUT", message: "Conexión extendida cerrada por seguridad" });
+            cleanup();
+            try { controller.close(); } catch {}
+          }
+        }, 30 * 60 * 1000);
       } catch (error) {
         console.error("[queue/stream] subscribe failed", error);
         send({

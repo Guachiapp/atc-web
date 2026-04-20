@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-/** Misma familia de versión que `firebase` en package.json (evita fallos al suscribirse al push). */
-const FIREBASE_JS_COMPAT_VERSION = "12.12.0";
+/** Versión de las librerías de Firebase Compat que debe cargar el Service Worker. */
+const FIREBASE_JS_COMPAT_VERSION = process.env.FIREBASE_JS_VERSION || "10.12.0";
 
 /**
  * Service worker para FCM (fondo). Debe servirse en la raíz del sitio (`/sw.js`) con scope `/`.

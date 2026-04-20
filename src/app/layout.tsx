@@ -13,7 +13,13 @@ export const metadata: Metadata = {
   description:
     "Cola por QR en recepción, turno con datos de Centinela, actualización en vivo (SSE) y avisos por notificación. Portal admin para generar códigos. Guachi.",
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+    (() => {
+      const url = process.env.NEXT_PUBLIC_APP_URL;
+      if (!url && process.env.NODE_ENV === "production") {
+        console.warn("[layout] ADVERTENCIA: NEXT_PUBLIC_APP_URL no definida en producción. MetadataBase podría fallar.");
+      }
+      return url || "http://localhost:3000";
+    })(),
   ),
   openGraph: {
     title: "Guachi ATC | Turnos y colas digitales",

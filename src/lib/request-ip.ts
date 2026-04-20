@@ -27,3 +27,14 @@ export function getClientIp(request: NextRequest): string {
 
   return "unknown";
 }
+
+/**
+ * Retorna un hash truncado de la IP para logs (anonimización PII).
+ */
+export function hashIp(ip: string): string {
+  if (!ip || ip === "unknown") return "unknown";
+  // Import dinámico de crypto para evitar problemas en edge runtime si fuera necesario, 
+  // pero Next.js ya provee crypto global o compatible.
+  const { createHash } = require("crypto");
+  return createHash("sha256").update(ip).digest("hex").slice(0, 8);
+}

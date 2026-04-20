@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClientIp } from "@/lib/request-ip";
+import { getClientIp, hashIp } from "@/lib/request-ip";
 import { z } from "zod";
 import { assertQueueSessionAccess } from "@/lib/queue-qr-tokens";
 import { fetchQueueUnidades } from "@/lib/queue-api";
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     console.log("[queue/unidades] calling upstream", {
       condominioId: session.condominioId,
       empresaIdFromQr: session.empresaId,
-      ip,
+      ipHash: hashIp(ip),
       userAgentPreview: userAgent.slice(0, 120),
     });
     const unidades = await fetchQueueUnidades(session.condominioId);

@@ -3,7 +3,7 @@
  * Hacia Centinela, `getQueueStatusForTicket` → `fetchQueueInfo` sí envía X-Internal-Key; un fallo upstream sería 502, no 403.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { getClientIp } from "@/lib/request-ip";
+import { getClientIp, hashIp } from "@/lib/request-ip";
 import { z } from "zod";
 import { assertQueueSessionAccess } from "@/lib/queue-qr-tokens";
 import { getQueueStatusForTicket } from "@/lib/queue-status-adapter";
@@ -35,7 +35,7 @@ export async function GET(
   if (!session) {
     console.warn("[queue/status] 403 sesión de cola inválida o expirada (IP/UA/hash Redis)", {
       uuid,
-      ipPreview: ip.slice(0, 32),
+      ipHash: hashIp(ip),
     });
     return NextResponse.json(
       {
