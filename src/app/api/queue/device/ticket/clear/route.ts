@@ -19,7 +19,7 @@ const BodySchema = z.object({
  * permita generar otro turno (tras atención completada).
  */
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = getClientIp(request);
   const userAgent = request.headers.get("user-agent") || "unknown";
   const bodyRaw = await request.json().catch(() => null);
   const parsed = BodySchema.safeParse(bodyRaw);

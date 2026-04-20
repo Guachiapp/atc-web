@@ -26,12 +26,8 @@ export function QueueQRGenerator() {
   const [generated, setGenerated] = useState<GeneratedQR | null>(null);
   const [error, setError] = useState("");
 
-  const adminHeaders = (): HeadersInit => {
-    const adminToken = localStorage.getItem("admin_token");
-    const h: Record<string, string> = { "Content-Type": "application/json" };
-    if (adminToken) h.Authorization = `Bearer ${adminToken}`;
-    return h;
-  };
+  /** Las rutas admin leen el token de la cookie HttpOnly — no se necesita header explícito. */
+  const jsonHeaders = (): HeadersInit => ({ "Content-Type": "application/json" });
 
   const fetchEmpresas = async () => {
     setUnidadesError("");
@@ -44,7 +40,7 @@ export function QueueQRGenerator() {
     setLoadingUnidades(true);
     try {
       const response = await fetch(`/api/admin/queue/unidades?condominioId=${id}`, {
-        headers: adminHeaders(),
+        credentials: "same-origin",
       });
       const json = await response.json();
       if (!json.success) {
@@ -82,18 +78,11 @@ export function QueueQRGenerator() {
     e.preventDefault();
     setError("");
     setGenerated(null);
-    const adminToken = localStorage.getItem("admin_token");
-    if (!adminToken) {
-      setError("Sesión de admin no disponible");
-      return;
-    }
 
     const response = await fetch("/api/admin/queue/qr/generate", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${adminToken}`,
-      },
+      headers: jsonHeaders(),
+      credentials: "same-origin",
       body: JSON.stringify({
         condominioId: Number(condominioId),
         empresaId: empresaId ? Number(empresaId) : null,
@@ -110,14 +99,10 @@ export function QueueQRGenerator() {
 
   const handleRevoke = async () => {
     if (!generated) return;
-    const adminToken = localStorage.getItem("admin_token");
-    if (!adminToken) return;
     const response = await fetch("/api/admin/queue/qr/revoke", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${adminToken}`,
-      },
+      headers: jsonHeaders(),
+      credentials: "same-origin",
       body: JSON.stringify({ token: generated.token }),
     });
     const json = await response.json();

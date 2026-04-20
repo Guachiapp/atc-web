@@ -14,21 +14,15 @@ export default function AdminQueueQrGeneratorPage() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem("admin_token");
-    if (!token) {
-      router.replace("/admin/login");
-      return;
-    }
-
+    // Verificar la sesión admin leyendo desde la cookie HttpOnly (transparente para el browser).
+    // El fetch incluye credentials para que la cookie se envíe al mismo origen.
     fetch("/api/admin/auth/verify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
+      method: "GET",
+      credentials: "same-origin",
     })
       .then((r) => r.json())
       .then((json) => {
         if (!json.valid) {
-          localStorage.removeItem("admin_token");
           router.replace("/admin/login");
           return;
         }

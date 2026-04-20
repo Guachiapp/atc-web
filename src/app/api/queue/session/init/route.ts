@@ -10,7 +10,7 @@ const Schema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = getClientIp(request);
   const userAgent = request.headers.get("user-agent") || "unknown";
   const limit = checkRateLimit(`queue:init:${ip}`, { maxRequests: 20, windowSeconds: 300 });
   if (!limit.allowed) {

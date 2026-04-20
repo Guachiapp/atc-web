@@ -54,14 +54,34 @@ function cleanupMemoryKey(key: string): void {
 
 async function withRedis<T>(action: (redis: Redis) => Promise<T>, fallback: () => T): Promise<T> {
   const redis = getRedisClient();
-  if (!redis) return fallback();
+  if (!redis) {
+    // Si no hay configuración (REDIS_URL vacío), se asume entorno de desarrollo puramente local y se usa memoria.
+    return fallback();
+  }
   try {
     if (redis.status === "wait") await redis.connect();
     return await action(redis);
   } catch (error) {
-    console.error("[redis-runtime] Redis operation failed, using memory fallback", error);
-    return fallback();
+    // Si hay REDIS_URL, ESTAMOS EN PRODUCCIÓN. Un fallo aquí es crítico y no debe degradarse a un estado en memoria aislado por nodo.
+    console.error("[redis-runtime] CRITICAL: Redis operation failed. Propagating error to return 503.", error);
+    throw new Error("Persistencia de Redis requerida pero no disponible (503)");
   }
+}
+
+/**
+ * Ejecuta una operación contra Redis de forma estricta (ya no aporta tanto por encima de withRedis, 
+ * pero asegura que ni siquiera localmente proceda si es indispensable, o alias para compatibilidad).
+ */
+export async function withRedisStrict<T>(action: (redis: Redis) => Promise<T>): Promise<T> {
+  const redis = getRedisClient();
+  if (!redis) {
+    throw new Error("REDIS_URL not configured. Redis is strictly required for this operation.");
+  }
+  
+  if (redis.status === "wait") {
+    await redis.connect();
+  }
+  return await action(redis);
 }
 
 export async function rtSetEx(key: string, seconds: number, value: string): Promise<void> {

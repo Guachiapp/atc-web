@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { isAdminSessionValid } from "@/lib/admin-auth";
 
-const VerifySchema = z.object({
-  token: z.string().min(1),
-});
-
-export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => null);
-  const parsed = VerifySchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ valid: false }, { status: 400 });
+/**
+ * GET /api/admin/auth/verify
+ *
+ * Verifica la sesión de administrador leyendo el token desde la cookie HttpOnly `admin_token`.
+ * No requiere body — el navegador envía la cookie automáticamente en cada request al mismo origen.
+ */
+export async function GET(request: NextRequest) {
+  const token = request.cookies.get("admin_token")?.value;
+  if (!token) {
+    return NextResponse.json({ valid: false }, { status: 401 });
   }
-  return NextResponse.json({ valid: await isAdminSessionValid(parsed.data.token) });
+  const valid = await isAdminSessionValid(token);
+  return NextResponse.json({ valid }, { status: valid ? 200 : 401 });
 }

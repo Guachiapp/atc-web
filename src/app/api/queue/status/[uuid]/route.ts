@@ -22,7 +22,7 @@ export async function GET(
     return NextResponse.json({ success: false, error: "UUID inválido" }, { status: 400 });
   }
 
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = getClientIp(request);
   const userAgent = request.headers.get("user-agent") || "unknown";
   const query = Object.fromEntries(request.nextUrl.searchParams.entries());
   const parsed = QuerySchema.safeParse(query);

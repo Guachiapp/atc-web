@@ -2,9 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { destroyAdminToken } from "@/lib/admin-auth";
 
 export async function POST(request: NextRequest) {
-  const auth = request.headers.get("authorization");
-  if (auth?.startsWith("Bearer ")) {
-    await destroyAdminToken(auth.slice(7));
+  const token = request.cookies.get("admin_token")?.value;
+  if (token) {
+    await destroyAdminToken(token);
   }
-  return NextResponse.json({ success: true });
+
+  const response = NextResponse.json({ success: true });
+  // Eliminar la cookie expirando inmediatamente.
+  response.cookies.set("admin_token", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+  return response;
 }

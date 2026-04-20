@@ -6,6 +6,10 @@
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME === "edge") return;
 
+  // Fail-fast: abortar arranque si faltan variables de entorno críticas de seguridad.
+  const { validateEnv } = await import("@/lib/env");
+  validateEnv();
+
   const { startRedisFcmLlamadoSubscriber } = await import("@/lib/redis-fcm-llamado-subscriber");
   startRedisFcmLlamadoSubscriber();
 }

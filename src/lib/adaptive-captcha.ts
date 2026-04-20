@@ -10,7 +10,8 @@ type Decision = {
 async function verifyTurnstileToken(token: string, ip: string): Promise<boolean> {
   const secret = process.env.TURNSTILE_SECRET_KEY;
   if (!secret) {
-    return process.env.NODE_ENV !== "production" && token === "dev-bypass";
+    console.warn("[adaptive-captcha] TURNSTILE_SECRET_KEY no configurado. Permitiendo bypass temporal en desarrollo, ¡NO USAR EN PRODUCCIÓN!");
+    return process.env.NODE_ENV !== "production";
   }
 
   try {

@@ -7,8 +7,11 @@ const LoginSchema = z.object({
   password: z.string().min(1),
 });
 
+/** Duración de la cookie de sesión admin en segundos (8 horas). */
+const SESSION_TTL_SECONDS = 8 * 60 * 60;
+
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = getClientIp(request);
   const ipBurstLimit = checkRateLimit(`admin:login:burst:${ip}`, { maxRequests: 30, windowSeconds: 60 });
   if (!ipBurstLimit.allowed) {
     return NextResponse.json(
@@ -31,12 +34,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Datos inválidos" }, { status: 400 });
   }
 
-  const valid = verifyAdminPassword(parsed.data.password);
+  const valid = await verifyAdminPassword(parsed.data.password);
   if (!valid) {
     return NextResponse.json({ success: false, error: "Credenciales inválidas" }, { status: 401 });
   }
 
   const token = createAdminToken();
   await createAdminSession(token);
-  return NextResponse.json({ success: true, token, expiresIn: 8 * 60 * 60 });
+
+  const isProduction = process.env.NODE_ENV === "production";
+  const response = NextResponse.json({ success: true, expiresIn: SESSION_TTL_SECONDS });
+
+  // Emitir el token como cookie HttpOnly para que no sea accesible desde JavaScript.
+  // SameSite=Lax protege contra CSRF: el cookie se envía en navegación de primer nivel
+  // pero no en peticiones cross-site iniciadas por terceros (p. ej. fetch desde otro dominio).
+  response.cookies.set("admin_token", token, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: "lax",
+    path: "/",
+    maxAge: SESSION_TTL_SECONDS,
+  });
+
+  return response;
 }

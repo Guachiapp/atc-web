@@ -12,7 +12,7 @@ const QuerySchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = getClientIp(request);
   const userAgent = request.headers.get("user-agent") || "unknown";
   const query = Object.fromEntries(request.nextUrl.searchParams.entries());
   const parsed = QuerySchema.safeParse(query);

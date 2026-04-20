@@ -23,11 +23,13 @@ export function AdminLogin({ onLoginSuccess }: AdminLoginProps) {
       const response = await fetch("/api/admin/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // Las credenciales se envían para que el browser acepte la cookie Set-Cookie de la respuesta.
+        credentials: "same-origin",
         body: JSON.stringify({ password }),
       });
       const json = await response.json();
       if (!json.success) throw new Error(json.error || "Credenciales inválidas");
-      localStorage.setItem("admin_token", json.token);
+      // El token ya NO se guarda en localStorage; el browser almacena la cookie HttpOnly automáticamente.
       onLoginSuccess();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error de autenticación");

@@ -16,7 +16,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ uuid: string }> },
 ) {
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = getClientIp(request);
   const userAgent = request.headers.get("user-agent") || "unknown";
   const { uuid } = await params;
   if (!z.string().uuid().safeParse(uuid).success) {
